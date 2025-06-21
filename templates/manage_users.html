@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">User Management</h2>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Type Statistics -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">Account Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="stat-card bg-primary text-white p-3 rounded text-center">
+                                <h3>{{ account_counts.total }}</h3>
+                                <p class="mb-0">Total Accounts</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-card bg-success text-white p-3 rounded text-center">
+                                <h3>{{ account_counts.savings }}</h3>
+                                <p class="mb-0">Savings</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-card bg-warning text-dark p-3 rounded text-center">
+                                <h3>{{ account_counts.current }}</h3>
+                                <p class="mb-0">Current</p>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="stat-card bg-danger text-white p-3 rounded text-center">
+                                <h3>{{ account_counts.joint }}</h3>
+                                <p class="mb-0">Joint</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card bg-secondary text-white p-3 rounded text-center">
+                                <h3>{{ account_counts.salary }}</h3>
+                                <p class="mb-0">Salary</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Add User Form -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Create New User</h5>
+                </div>
+                <div class="card-body">
+                    {% if error %}
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        {{ error }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% elif message and request.form.get('form_action') == 'add' %}
+                    <div class="alert alert-success alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endif %}
+
+                    <form method="POST" class="needs-validation" novalidate>
+                        <input type="hidden" name="form_action" value="add">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                                <div class="invalid-feedback">Please enter a username.</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="password" class="form-label">Password</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="password" name="password" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="togglePassword">
+                                        Show
+                                    </button>
+                                </div>
+                                <div class="invalid-feedback">Please enter a password.</div>
+                                <div class="form-text">Minimum 8 characters with uppercase, lowercase, number, and symbol</div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="full_name" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="full_name" name="full_name" required>
+                                <div class="invalid-feedback">Please enter the full name.</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="account_type" class="form-label">Account Type</label>
+                                <select class="form-select" id="account_type" name="account_type" required>
+                                    <option value="" disabled selected>Select account type</option>
+                                    <option value="savings">Savings Account</option>
+                                    <option value="current">Current Account</option>
+                                    <option value="joint">Joint Account</option>
+                                    <option value="salary">Salary Account</option>
+                                </select>
+                                <div class="invalid-feedback">Please select an account type.</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="gender" class="form-label">Gender</label>
+                                <select class="form-select" id="gender" name="gender" required>
+                                    <option value="" disabled selected>Select gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                                <div class="invalid-feedback">Please select a gender.</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                                <div class="invalid-feedback">Please enter a valid email.</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="dob" class="form-label">Date of Birth</label>
+                                <input type="date" class="form-control" id="dob" name="dob" required>
+                                <div class="invalid-feedback">Please select a date of birth.</div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label for="phone" class="form-label">Mobile Number</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" required>
+                                <div class="invalid-feedback">Please enter a phone number.</div>
+                            </div>
+                            
+                            <div class="col-12 mt-3">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    Create User Account
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Users Table -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">Existing Users</h5>
+                </div>
+                <div class="card-body">
+                    {% if message and request.form.get('form_action') != 'add' %}
+                    <div class="alert alert-success alert-dismissible fade show mb-3">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Type</th>
+                                    <th>Gender</th>
+                                    <th>Phone</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <form method="POST" action="{{ url_for('manage_users') }}">
+                                        <input type="hidden" name="user_id" value="{{ user[0] }}">
+                                        <input type="hidden" name="form_action" value="update">
+                                        
+                                        <td>{{ user[1] }}</td>
+                                        
+                                        <td>
+                                            <input type="text" name="full_name" class="form-control form-control-sm" value="{{ user[2] }}" required>
+                                        </td>
+                                        
+                                        <td>
+                                            <input type="email" name="email" class="form-control form-control-sm" value="{{ user[3] }}" required>
+                                        </td>
+                                        
+                                        <td>
+                                            <select name="account_type" class="form-select form-select-sm" required>
+                                                <option value="savings" {% if user[4] == 'savings' %}selected{% endif %}>Savings</option>
+                                                <option value="current" {% if user[4] == 'current' %}selected{% endif %}>Current</option>
+                                                <option value="joint" {% if user[4] == 'joint' %}selected{% endif %}>Joint</option>
+                                                <option value="salary" {% if user[4] == 'salary' %}selected{% endif %}>Salary</option>
+                                            </select>
+                                        </td>
+                                        
+                                        <td>
+                                            <select name="gender" class="form-select form-select-sm" required>
+                                                <option value="male" {% if user[5] == 'male' %}selected{% endif %}>Male</option>
+                                                <option value="female" {% if user[5] == 'female' %}selected{% endif %}>Female</option>
+                                                <option value="other" {% if user[5] == 'other' %}selected{% endif %}>Other</option>
+                                            </select>
+                                        </td>
+                                        
+                                        <td>
+                                            <input type="tel" name="phone" class="form-control form-control-sm" value="{{ user[6] }}" required>
+                                        </td>
+                                        
+                                        <td class="text-end">
+                                            <div class="d-flex gap-2 justify-content-end">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    Save
+                                                </button>
+                                                {% if is_admin %}
+                                                <button type="button" class="btn btn-sm btn-warning" 
+                                                    data-bs-toggle="modal" data-bs-target="#changePasswordModal"
+                                                    onclick="setChangePasswordUserId('{{ user[0] }}')">
+                                                    Change Password
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-danger" 
+                                                    data-bs-toggle="modal" data-bs-target="#deleteModal{{ user[0] }}">
+                                                    Delete
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </form>
+                                    
+                                    <!-- Delete Confirmation Modal -->
+                                    <div class="modal fade" id="deleteModal{{ user[0] }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Confirm Deletion</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p>Are you sure you want to delete user <strong>{{ user[1] }}</strong>? This action cannot be undone.</p>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <form method="POST" style="display: inline;">
+                                                        <input type="hidden" name="user_id" value="{{ user[0] }}">
+                                                        <input type="hidden" name="form_action" value="delete">
+                                                        <button type="submit" class="btn btn-danger">Delete User</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if not users %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">No users found</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="changePasswordForm">
+                <input type="hidden" name="form_action" value="change_password">
+                <input type="hidden" name="user_id" id="changePasswordUserId">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        <div class="form-text">Must contain 8+ characters with uppercase, lowercase, number, and symbol</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <div class="invalid-feedback">Passwords must match</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Change Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Password visibility toggle
+    document.getElementById('togglePassword').addEventListener('click', function() {
+        const input = document.getElementById('password');
+        input.type = input.type === 'password' ? 'text' : 'password';
+        this.textContent = input.type === 'password' ? 'Show' : 'Hide';
+    });
+
+    // Set user ID for password change
+    function setChangePasswordUserId(userId) {
+        document.getElementById('changePasswordUserId').value = userId;
+        document.getElementById('changePasswordForm').reset();
+    }
+    
+    // Confirm password validation
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        if (this.value !== document.getElementById('new_password').value) {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+    });
+    
+    // Form validation before submission
+    document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+        const newPassword = document.getElementById('new_password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        
+        if (newPassword !== confirmPassword) {
+            e.preventDefault();
+            document.getElementById('confirm_password').classList.add('is-invalid');
+        }
+    });
+
+    // Bootstrap form validation
+    (function() {
+        const forms = document.querySelectorAll('.needs-validation');
+        Array.from(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            });
+        });
+    })();
+</script>
+{% endblock %}

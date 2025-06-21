@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Users</title>
+</head>
+<body style="font-family: Arial, sans-serif;">
+    <h1>Manage Users</h1>
+
+    {% if message %}
+        <p style="color: green;">{{ message }}</p>
+    {% endif %}
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <h3>Add New User</h3>
+    <form method="POST">
+        <input type="hidden" name="form_action" value="add">
+        <table style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Username</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Password</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Full Name</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Account Type</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Gender</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Email</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">DOB</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Phone</th>
+                <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Action</th>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="text" name="username" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px; position: relative;">
+                    <div style="position: relative;">
+                        <input type="password" name="password" id="password" required style="width: 100%; padding-right: 30px; box-sizing: border-box;">
+                        <button type="button" onclick="togglePassword()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0;">👁️</button>
+                    </div>
+                </td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="text" name="full_name" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <select name="account_type" style="width: 100%; box-sizing: border-box;">
+                        <option value="savings">Savings</option>
+                        <option value="current">Current</option>
+                        <option value="joint">Joint</option>
+                        <option value="salary">Salary</option>
+                    </select>
+                </td>
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <select name="gender" style="width: 100%; box-sizing: border-box;">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                </td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="email" name="email" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="date" name="dob" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="text" name="phone" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><button type="submit">Add</button></td>
+            </tr>
+        </table>
+    </form>
+
+    <h3>Existing Users</h3>
+    <table style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Username</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Full Name</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Email</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Account Type</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Gender</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Phone</th>
+            <th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">Actions</th>
+        </tr>
+        {% for user in users %}
+        <tr>
+            <form method="POST">
+                <input type="hidden" name="form_action" value="update">
+                <input type="hidden" name="user_id" value="{{ user[0] }}">
+                <td style="border: 1px solid #ddd; padding: 8px;">{{ user[1] }}</td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="text" name="full_name" value="{{ user[2] }}" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="email" name="email" value="{{ user[3] }}" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <select name="account_type" style="width: 100%; box-sizing: border-box;">
+                        <option value="savings" {% if user[4] == 'savings' %}selected{% endif %}>Savings</option>
+                        <option value="current" {% if user[4] == 'current' %}selected{% endif %}>Current</option>
+                        <option value="joint" {% if user[4] == 'joint' %}selected{% endif %}>Joint</option>
+                        <option value="salary" {% if user[4] == 'salary' %}selected{% endif %}>Salary</option>
+                    </select>
+                </td>
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <select name="gender" style="width: 100%; box-sizing: border-box;">
+                        <option value="male" {% if user[5] == 'male' %}selected{% endif %}>Male</option>
+                        <option value="female" {% if user[5] == 'female' %}selected{% endif %}>Female</option>
+                        <option value="other" {% if user[5] == 'other' %}selected{% endif %}>Other</option>
+                    </select>
+                </td>
+                <td style="border: 1px solid #ddd; padding: 8px;"><input type="text" name="phone" value="{{ user[6] }}" required style="width: 100%; box-sizing: border-box;"></td>
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <button type="submit">Update</button>
+                </td>
+            </form>
+            <form method="POST" onsubmit="return confirm('Are you sure you want to delete this user?');">
+                <input type="hidden" name="form_action" value="delete">
+                <input type="hidden" name="user_id" value="{{ user[0] }}">
+                <td style="border: 1px solid #ddd; padding: 8px;">
+                    <button type="submit" style="background-color:red; color:white;">Delete</button>
+                </td>
+            </form>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <br>
+    <a href="{{ url_for('dashboard') }}">⬅ Back to Dashboard</a>
+
+    <script>
+    function togglePassword() {
+        const passwordField = document.getElementById('password');
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+        } else {
+            passwordField.type = 'password';
+        }
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card profile-card shadow">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">
+                        <i class="fas fa-user-circle me-2"></i>User Profile
+                    </h3>
+                    <span class="badge bg-light text-dark">
+                        {{ user[3]|upper }} ACCOUNT
+                    </span>
+                </div>
+            </div>
+            
+            <div class="card-body">
+                <div class="row">
+                    <!-- Personal Information Column -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 account-info-card">
+                            <div class="card-body">
+                                <h5 class="card-title border-bottom pb-2">
+                                    <i class="fas fa-id-card me-2"></i>Personal Information
+                                </h5>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">FULL NAME</p>
+                                    <p class="fs-5">{{ user[1] }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">USERNAME</p>
+                                    <p class="fs-5">{{ user[0] }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">DATE OF BIRTH</p>
+                                    <p class="fs-5">{{ user[5] }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">GENDER</p>
+                                    <p class="fs-5">{{ user[4]|capitalize }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Account Information Column -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 account-info-card">
+                            <div class="card-body">
+                                <h5 class="card-title border-bottom pb-2">
+                                    <i class="fas fa-university me-2"></i>Account Information
+                                </h5>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">EMAIL ADDRESS</p>
+                                    <p class="fs-5">{{ user[2] }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">PHONE NUMBER</p>
+                                    <p class="fs-5">{{ user[6] }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">ACCOUNT TYPE</p>
+                                    <p class="fs-5">{{ user[3]|capitalize }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <p class="mb-1 text-muted small">MEMBER SINCE</p>
+                                    <p class="fs-5">{{ user[7] }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between mt-3">
+                    <a href="{{ url_for('change_password') }}" class="btn btn-warning btn-lg">
+                        <i class="fas fa-key me-2"></i> Change Password
+                    </a>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

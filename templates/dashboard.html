@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- DUPLICATE NAVBAR REMOVED HERE -->
+
+    <div class="container py-4">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h3><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h3>
+            </div>
+            <div class="col-md-6 text-end">
+                <span class="badge bg-info text-dark">
+                    Account Type: {{ account_type|capitalize }}
+                </span>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Account Statistics Cards -->
+            <div class="col-md-3">
+                <div class="account-card card h-100 border-primary" style="opacity: 0; transform: translateY(20px);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-piggy-bank fa-3x text-primary mb-3"></i>
+                        <h5 class="card-title">Salary Accounts</h5>
+                        <h2 class="text-primary">{{ account_stats.female_savings }}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="account-card card h-100 border-success" style="opacity: 0; transform: translateY(20px);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-wallet fa-3x text-success mb-3"></i>
+                        <h5 class="card-title">Savings Accounts</h5>
+                        <h2 class="text-success">{{ account_stats.male_savings }}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="account-card card h-100 border-warning" style="opacity: 0; transform: translateY(20px);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-handshake fa-3x text-warning mb-3"></i>
+                        <h5 class="card-title">Joint Accounts</h5>
+                        <h2 class="text-warning">{{ account_stats.joint }}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="account-card card h-100 border-danger" style="opacity: 0; transform: translateY(20px);">
+                    <div class="card-body text-center">
+                        <i class="fas fa-business-time fa-3x text-danger mb-3"></i>
+                        <h5 class="card-title">Current Accounts</h5>
+                        <h2 class="text-danger">{{ account_stats.male_current }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-user-circle me-2"></i>Account Information
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Full Name:</strong> {{ full_name }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Account Type:</strong> {{ account_type|capitalize }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Last Login:</strong> Just now
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-bell me-2"></i>Recent Activities
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <i class="fas fa-sign-in-alt text-primary me-2"></i>
+                                Successful login
+                                <span class="float-end text-muted small">Just now</span>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-user-shield text-info me-2"></i>
+                                Password updated
+                                <span class="float-end text-muted small">2 days ago</span>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-exchange-alt text-warning me-2"></i>
+                                Funds transfer
+                                <span class="float-end text-muted small">1 week ago</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Animation Script (Keep if needed) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const accountCards = document.querySelectorAll('.account-card');
+        accountCards.forEach((card, index) => {
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 100 * index);
+        });
+    });
+</script>
+{% endblock %}
