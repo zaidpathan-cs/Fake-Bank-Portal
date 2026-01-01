@@ -108,6 +108,17 @@
         </div>
     </div>
 </div>
+<!-- Simple version at the top of dashboard.html -->
+<div style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd;">
+    {% if is_admin %}
+    <a href="{{ url_for('waf.waf_admin') }}" style="margin-right: 15px; color: #dc3545;">
+        <strong>⚔️ WAF Security Dashboard</strong>
+    </a>
+    <a href="{{ url_for('waf.waf_test_page') }}" style="margin-right: 15px; color: #007bff;">
+        Test WAF
+    </a>
+    {% endif %}
+</div>
 <!-- Add this somewhere in your dashboard.html -->
 <div class="waf-status" style="position: fixed; bottom: 10px; right: 10px; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 12px;">
     <strong>WAF Status:</strong><br>
