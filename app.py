@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, session, redirect, url_for, flash, jsonify, g, Blueprint
+from flask import Flask, request, render_template, session, redirect, url_for, flash, jsonify, g, Blueprint, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import sqlite3
@@ -12,6 +12,7 @@ from flask_limiter.util import get_remote_address
 from functools import wraps
 from collections import defaultdict
 import html
+import uuid
 
 app = Flask(__name__)
 app.secret_key = 'insecure_secret_key_123!'  # Hardcoded secret
@@ -104,29 +105,6 @@ class InputSanitizer:
             sanitized = re.sub(pattern, replacement, sanitized, flags=flags)
         
         return sanitized
-    
-    @staticmethod
-    def validate_email(email):
-        """Simple email validation"""
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        return bool(re.match(pattern, email))
-    
-    @staticmethod
-    def validate_password(password):
-        """Password strength validation"""
-        if len(password) < 8:
-            return False, "Password must be at least 8 characters"
-        
-        if not re.search(r'[A-Z]', password):
-            return False, "Password must contain uppercase letter"
-        
-        if not re.search(r'[a-z]', password):
-            return False, "Password must contain lowercase letter"
-        
-        if not re.search(r'\d', password):
-            return False, "Password must contain digit"
-        
-        return True, "Password is strong"
 
 # ============================
 # WAF MIDDLEWARE
@@ -190,6 +168,12 @@ class WAFMiddleware:
             threats = self._check_request()
             if threats:
                 g.waf_threats = threats
+                # Don't block WAF routes themselves
+                if not request.path.startswith('/waf/'):
+                    if self.config.PROTECTION_MODE:
+                        total_severity = sum(t['severity'] for t in threats)
+                        if total_severity > self.config.SQLI_SENSITIVITY * len(threats):
+                            return self._block_request(f"WAF Protection: {len(threats)} threats detected", 403)
     
     def _check_request(self):
         """Analyze incoming request for threats"""
@@ -199,14 +183,11 @@ class WAFMiddleware:
         # Check IP against blacklist
         if self._is_ip_blocked(ip):
             threats.append({'type': 'blocked_ip', 'severity': 10, 'source': 'ip', 'input': ip})
-            if self.config.PROTECTION_MODE:
-                return self._block_request("IP Blocked", 403)
+            return threats
         
         # Rate limiting
         if not self._check_rate_limit(ip):
             threats.append({'type': 'rate_limit', 'severity': 8, 'source': 'ip', 'input': ip})
-            if self.config.PROTECTION_MODE:
-                return self._block_request("Rate limit exceeded", 429)
         
         # SQL Injection detection
         sql_threats = self._detect_sql_injection()
@@ -227,12 +208,6 @@ class WAFMiddleware:
         # Log threats if any
         if threats:
             self._log_threats(threats, ip)
-            
-            # Block if in protection mode
-            if self.config.PROTECTION_MODE:
-                total_severity = sum(t['severity'] for t in threats)
-                if total_severity > self.config.SQLI_SENSITIVITY * len(threats):
-                    return self._block_request(f"WAF Protection: {len(threats)} threats detected", 403)
         
         return threats
     
@@ -324,18 +299,13 @@ class WAFMiddleware:
         """Implement rate limiting"""
         current_time = time.time()
         minute_window = current_time - 60
-        hour_window = current_time - 3600
         
         # Clean old entries
-        self.request_log[ip] = [t for t in self.request_log[ip] if t > hour_window]
+        self.request_log[ip] = [t for t in self.request_log[ip] if t > minute_window]
         
-        # Check limits
-        minute_count = sum(1 for t in self.request_log[ip] if t > minute_window)
-        hour_count = len(self.request_log[ip])
-        
+        # Check limit
+        minute_count = len(self.request_log[ip])
         if minute_count > self.config.REQUESTS_PER_MINUTE:
-            return False
-        if hour_count > self.config.REQUESTS_PER_HOUR:
             return False
         
         self.request_log[ip].append(current_time)
@@ -378,19 +348,6 @@ class WAFMiddleware:
         try:
             conn = sqlite3.connect('vulnerable_bank.db')
             cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS waf_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp REAL,
-                    ip TEXT,
-                    method TEXT,
-                    path TEXT,
-                    user_agent TEXT,
-                    threat_type TEXT,
-                    threat_details TEXT,
-                    blocked INTEGER
-                )
-            ''')
             
             for threat in log_entry.get('threats', []):
                 cursor.execute('''
@@ -438,7 +395,7 @@ def waf_protected(f):
         if hasattr(g, 'waf_threats') and g.waf_threats:
             if WAFConfig.PROTECTION_MODE:
                 flash("Request blocked by WAF protection", "danger")
-                return redirect(url_for('waf_dashboard'))
+                return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -539,168 +496,169 @@ def check_password_history(user_id, new_password_hash):
         return any(check_password_hash(h[0], new_password_hash) for h in history)
 
 # ============================
-# WAF DASHBOARD BLUEPRINT
+# WAF DASHBOARD BLUEPRINT - SIMPLIFIED
 # ============================
-waf_dashboard_bp = Blueprint('waf', __name__, url_prefix='/waf')
+waf_bp = Blueprint('waf', __name__, url_prefix='/waf')
 
-@waf_dashboard_bp.route('/admin')
+@waf_bp.route('/')
 @login_required
 @admin_required
-def waf_admin():
-    """WAF Admin Dashboard"""
-    with closing(get_db()) as db:
-        # Get WAF statistics
-        stats = db.execute('''
-            SELECT 
-                COUNT(*) as total_logs,
-                SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END) as blocked_logs,
-                COUNT(DISTINCT ip) as unique_ips,
-                threat_type,
-                COUNT(*) as count
-            FROM waf_logs
-            GROUP BY threat_type
-        ''').fetchall()
-        
-        recent_logs = db.execute('''
-            SELECT * FROM waf_logs 
-            ORDER BY timestamp DESC 
-            LIMIT 50
-        ''').fetchall()
-        
-        blocked_ips = db.execute('SELECT * FROM blocked_ips ORDER BY blocked_at DESC').fetchall()
-        
-    return render_template('waf_dashboard.html', 
-                         stats=stats, 
-                         recent_logs=recent_logs, 
-                         blocked_ips=blocked_ips,
-                         config=WAFConfig())
+def waf_home():
+    return redirect(url_for('waf.waf_dashboard'))
 
-@waf_dashboard_bp.route('/stats')
+@waf_bp.route('/dashboard')
 @login_required
 @admin_required
-def waf_stats():
-    """Get WAF statistics in JSON format"""
-    with closing(get_db()) as db:
-        # Get stats for last 24 hours
-        twenty_four_hours_ago = time.time() - 86400
-        
-        total_logs = db.execute('SELECT COUNT(*) FROM waf_logs WHERE timestamp > ?', 
-                               (twenty_four_hours_ago,)).fetchone()[0]
-        blocked_logs = db.execute('SELECT COUNT(*) FROM waf_logs WHERE blocked = 1 AND timestamp > ?', 
-                                 (twenty_four_hours_ago,)).fetchone()[0]
-        
-        threat_types = db.execute('''
-            SELECT threat_type, COUNT(*) as count 
-            FROM waf_logs 
-            WHERE timestamp > ? 
-            GROUP BY threat_type
-        ''', (twenty_four_hours_ago,)).fetchall()
-        
-        top_ips = db.execute('''
-            SELECT ip, COUNT(*) as count 
-            FROM waf_logs 
-            WHERE timestamp > ? 
-            GROUP BY ip 
-            ORDER BY count DESC 
-            LIMIT 10
-        ''', (twenty_four_hours_ago,)).fetchall()
+def waf_dashboard():
+    """WAF Dashboard - Main Page"""
+    try:
+        # Read logs from file
+        with open(WAFConfig.LOG_FILE, 'r') as f:
+            lines = f.readlines()[-20:]  # Last 20 entries
+            logs = [json.loads(line) for line in lines]
+    except FileNotFoundError:
+        logs = []
     
-    return jsonify({
-        'total_logs': total_logs,
-        'blocked_logs': blocked_logs,
-        'threat_types': dict(threat_types),
-        'top_ips': dict(top_ips),
-        'learning_mode': WAFConfig.LEARNING_MODE,
-        'protection_mode': WAFConfig.PROTECTION_MODE
-    })
+    # Get stats
+    try:
+        conn = sqlite3.connect('vulnerable_bank.db')
+        cursor = conn.cursor()
+        
+        # Get total threats
+        cursor.execute('SELECT COUNT(*) FROM waf_logs')
+        total_threats = cursor.fetchone()[0]
+        
+        # Get blocked threats
+        cursor.execute('SELECT COUNT(*) FROM waf_logs WHERE blocked = 1')
+        blocked_threats = cursor.fetchone()[0]
+        
+        # Get threat types
+        cursor.execute('SELECT threat_type, COUNT(*) FROM waf_logs GROUP BY threat_type')
+        threat_types = cursor.fetchall()
+        
+        conn.close()
+    except:
+        total_threats = 0
+        blocked_threats = 0
+        threat_types = []
+    
+    return render_template('waf_dashboard.html',
+                         logs=logs,
+                         total_threats=total_threats,
+                         blocked_threats=blocked_threats,
+                         threat_types=threat_types,
+                         blocked_ips=WAFConfig.BLOCKED_IPS,
+                         learning_mode=WAFConfig.LEARNING_MODE,
+                         protection_mode=WAFConfig.PROTECTION_MODE,
+                         username=session.get('username'))
 
-@waf_dashboard_bp.route('/block_ip', methods=['POST'])
+@waf_bp.route('/test')
+@login_required
+@admin_required
+def waf_test():
+    """WAF Test Page"""
+    test_cases = [
+        {
+            'name': 'SQL Injection - Basic Bypass',
+            'description': "Try to bypass login with SQL injection",
+            'url': '/login',
+            'method': 'POST',
+            'payload': {"username": "admin' OR '1'='1", "password": "anything"}
+        },
+        {
+            'name': 'SQL Injection - UNION Attack',
+            'description': "Try UNION-based SQL injection",
+            'url': '/dashboard',
+            'method': 'GET', 
+            'payload': {"user_id": "1 UNION SELECT username, password FROM users"}
+        },
+        {
+            'name': 'XSS - Script Tag',
+            'description': "Try basic XSS with script tag",
+            'url': '/search',
+            'method': 'GET',
+            'payload': {"q": "<script>alert('XSS')</script>"}
+        },
+        {
+            'name': 'XSS - Image onerror',
+            'description': "Try XSS using image onerror event",
+            'url': '/profile',
+            'method': 'POST',
+            'payload': {"name": "<img src=x onerror=alert(1)>"}
+        }
+    ]
+    
+    return render_template('waf_test.html', test_cases=test_cases)
+
+@waf_bp.route('/toggle/<mode>')
+@login_required
+@admin_required
+def toggle_mode(mode):
+    """Toggle WAF mode"""
+    if mode == 'learning':
+        WAFConfig.LEARNING_MODE = True
+        WAFConfig.PROTECTION_MODE = False
+        flash('WAF switched to Learning Mode (logs only)', 'info')
+    elif mode == 'protection':
+        WAFConfig.LEARNING_MODE = False
+        WAFConfig.PROTECTION_MODE = True
+        flash('WAF switched to Protection Mode (blocks attacks)', 'warning')
+    elif mode == 'off':
+        WAFConfig.LEARNING_MODE = False
+        WAFConfig.PROTECTION_MODE = False
+        flash('WAF disabled', 'danger')
+    
+    return redirect(url_for('waf.waf_dashboard'))
+
+@waf_bp.route('/block', methods=['POST'])
 @login_required
 @admin_required
 def block_ip():
     """Block an IP address"""
-    ip = request.json.get('ip')
-    reason = request.json.get('reason', 'Manual block by admin')
+    ip = request.form.get('ip')
+    reason = request.form.get('reason', 'Manual block by admin')
     
     if ip:
         WAFConfig.BLOCKED_IPS.append(ip)
-        with closing(get_db()) as db:
-            db.execute('''
+        try:
+            conn = sqlite3.connect('vulnerable_bank.db')
+            cursor = conn.cursor()
+            cursor.execute('''
                 INSERT OR REPLACE INTO blocked_ips (ip, reason, blocked_by)
                 VALUES (?, ?, ?)
             ''', (ip, reason, session.get('username', 'admin')))
-            db.commit()
+            conn.commit()
+            conn.close()
+        except:
+            pass
         
-        return jsonify({'status': 'success', 'message': f'IP {ip} blocked'})
-    
-    return jsonify({'status': 'error', 'message': 'No IP provided'}), 400
-
-@waf_dashboard_bp.route('/unblock_ip', methods=['POST'])
-@login_required
-@admin_required
-def unblock_ip():
-    """Unblock an IP address"""
-    ip = request.json.get('ip')
-    
-    if ip and ip in WAFConfig.BLOCKED_IPS:
-        WAFConfig.BLOCKED_IPS.remove(ip)
-        with closing(get_db()) as db:
-            db.execute('DELETE FROM blocked_ips WHERE ip = ?', (ip,))
-            db.commit()
-        
-        return jsonify({'status': 'success', 'message': f'IP {ip} unblocked'})
-    
-    return jsonify({'status': 'error', 'message': 'IP not found'}), 400
-
-@waf_dashboard_bp.route('/toggle_mode', methods=['POST'])
-@login_required
-@admin_required
-def toggle_waf_mode():
-    """Toggle between learning and protection mode"""
-    mode = request.json.get('mode')
-    
-    if mode == 'learning':
-        WAFConfig.LEARNING_MODE = True
-        WAFConfig.PROTECTION_MODE = False
-    elif mode == 'protection':
-        WAFConfig.LEARNING_MODE = False
-        WAFConfig.PROTECTION_MODE = True
-    elif mode == 'off':
-        WAFConfig.LEARNING_MODE = False
-        WAFConfig.PROTECTION_MODE = False
+        flash(f'IP {ip} blocked successfully', 'success')
     else:
-        return jsonify({'status': 'error', 'message': 'Invalid mode'}), 400
+        flash('No IP address provided', 'danger')
     
-    return jsonify({
-        'status': 'success',
-        'message': f'WAF switched to {mode} mode',
-        'learning_mode': WAFConfig.LEARNING_MODE,
-        'protection_mode': WAFConfig.PROTECTION_MODE
-    })
+    return redirect(url_for('waf.waf_dashboard'))
 
-@waf_dashboard_bp.route('/test')
+@waf_bp.route('/unblock/<ip>')
 @login_required
 @admin_required
-def waf_test_page():
-    """WAF test page"""
-    test_cases = {
-        'SQL Injection': [
-            {"url": "/login", "method": "POST", "payload": {"username": "admin' OR '1'='1", "password": "test"}},
-            {"url": "/dashboard", "method": "GET", "payload": {"user_id": "1 OR 1=1"}},
-            {"url": "/profile", "method": "GET", "payload": {"id": "1'; DROP TABLE users; --"}},
-        ],
-        'XSS Attacks': [
-            {"url": "/search", "method": "GET", "payload": {"q": "<script>alert('XSS')</script>"}},
-            {"url": "/profile", "method": "POST", "payload": {"name": "<img src=x onerror=alert(1)>"}},
-            {"url": "/dashboard", "method": "GET", "payload": {"query": "javascript:alert('XSS')"}},
-        ],
-        'Path Traversal': [
-            {"url": "/../../etc/passwd", "method": "GET", "payload": {}},
-            {"url": "/static/../../../config.py", "method": "GET", "payload": {}},
-        ]
-    }
+def unblock_ip(ip):
+    """Unblock an IP address"""
+    if ip in WAFConfig.BLOCKED_IPS:
+        WAFConfig.BLOCKED_IPS.remove(ip)
+        try:
+            conn = sqlite3.connect('vulnerable_bank.db')
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM blocked_ips WHERE ip = ?', (ip,))
+            conn.commit()
+            conn.close()
+        except:
+            pass
+        
+        flash(f'IP {ip} unblocked', 'success')
+    else:
+        flash(f'IP {ip} not found in block list', 'warning')
     
-    return render_template('waf_test.html', test_cases=test_cases)
+    return redirect(url_for('waf.waf_dashboard'))
 
 # ============================
 # APPLICATION ROUTES
@@ -713,17 +671,11 @@ def home():
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("50 per minute")
-@waf_protected
 def login():
     error = None
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
-        # Optional: Sanitize inputs in learning mode
-        if not WAFConfig.PROTECTION_MODE:
-            username = InputSanitizer.sanitize_sql(username)
-            password = InputSanitizer.sanitize_sql(password)
         
         with closing(get_db()) as db:
             # VULNERABLE: String interpolation
@@ -759,7 +711,6 @@ def logout():
 
 @app.route('/dashboard')
 @login_required
-@waf_protected
 def dashboard():
     with closing(get_db()) as db:
         # VULNERABLE: Added OR 1=1
@@ -790,12 +741,10 @@ def dashboard():
                            full_name=session['full_name'],
                            account_type=session['account_type'],
                            account_stats=account_stats,
-                           is_admin=session.get('is_admin', False),
-                           waf_mode="PROTECTION" if WAFConfig.PROTECTION_MODE else "LEARNING")
+                           is_admin=session.get('is_admin', False))
 
 @app.route('/profile')
 @login_required
-@waf_protected
 def profile():
     with closing(get_db()) as db:
         user = db.execute(f'''
@@ -806,18 +755,11 @@ def profile():
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
-@waf_protected
 def change_password():
     if request.method == 'POST':
         current_password = request.form['current_password']
         new_password = request.form['new_password']
         confirm_password = request.form['confirm_password']
-        
-        # Optional: Sanitize inputs
-        if not WAFConfig.PROTECTION_MODE:
-            current_password = InputSanitizer.sanitize_sql(current_password)
-            new_password = InputSanitizer.sanitize_sql(new_password)
-            confirm_password = InputSanitizer.sanitize_sql(confirm_password)
         
         with closing(get_db()) as db:
             user = db.execute(
@@ -849,7 +791,6 @@ def change_password():
 @app.route('/admin/users', methods=['GET', 'POST'])
 @login_required
 @admin_required
-@waf_protected
 def manage_users():
     message, error = None, None
     with closing(get_db()) as db:
@@ -862,14 +803,7 @@ def manage_users():
                 username = request.form['username']
                 email = request.form['email']
                 password = request.form['password']
-                
-                # Optional sanitization
-                if not WAFConfig.PROTECTION_MODE:
-                    username = InputSanitizer.sanitize_sql(username)
-                    email = InputSanitizer.sanitize_sql(email)
-                    password = InputSanitizer.sanitize_sql(password)
 
-                # 🔥 Unsafe SQL Injection point
                 check_query = f"SELECT 1 FROM users WHERE username = '{username}' OR email = '{email}'"
                 check = cursor.execute(check_query).fetchone()
 
@@ -878,7 +812,6 @@ def manage_users():
                 elif not is_password_strong(password):
                     error = "Weak password"
                 else:
-                    # 🔥 Unsafe INSERT
                     insert_query = f'''
                         INSERT INTO users (username, password_hash, email, full_name, account_type, gender, dob, phone)
                         VALUES ('{username}', '{generate_password_hash(password)}', '{email}',
@@ -890,7 +823,6 @@ def manage_users():
                     message = f"User {username} added"
 
             elif form_action == 'update':
-                # 🔥 Vulnerable to SQLi
                 update_query = f'''
                     UPDATE users SET
                         full_name = '{request.form['full_name']}',
@@ -905,7 +837,6 @@ def manage_users():
                 message = "User updated"
 
             elif form_action == 'delete':
-                # 🔥 Vulnerable to SQLi
                 delete_query = f"DELETE FROM users WHERE id = {request.form['user_id']} AND username != 'admin'"
                 cursor.execute(delete_query)
                 db.commit()
@@ -915,11 +846,6 @@ def manage_users():
                 user_id = request.form['user_id']
                 new_password = request.form['new_password']
                 confirm_password = request.form['confirm_password']
-                
-                # Optional sanitization
-                if not WAFConfig.PROTECTION_MODE:
-                    new_password = InputSanitizer.sanitize_sql(new_password)
-                    confirm_password = InputSanitizer.sanitize_sql(confirm_password)
 
                 if new_password != confirm_password:
                     error = "Passwords do not match"
@@ -927,13 +853,11 @@ def manage_users():
                     error = "Weak password"
                 else:
                     new_hash = generate_password_hash(new_password)
-                    # 🔥 Unsafe SQL injection point
                     cursor.execute(f"UPDATE users SET password_hash = '{new_hash}' WHERE id = {user_id}")
                     cursor.execute(f"INSERT INTO password_history (user_id, password_hash) VALUES ({user_id}, '{new_hash}')")
                     db.commit()
                     message = "Password updated"
 
-        # Keep these safe queries for user listing
         users = db.execute('SELECT id, username, full_name, email, account_type, gender, phone FROM users WHERE username != "admin"').fetchall()
         account_counts = {
             'total': db.execute('SELECT COUNT(*) FROM users WHERE username != "admin"').fetchone()[0],
@@ -950,6 +874,9 @@ def manage_users():
                            error=error,
                            is_admin=session.get('is_admin', False))
 
+# ============================
+# SIMPLE WAF STATUS ROUTE
+# ============================
 @app.route('/waf/status')
 @login_required
 def waf_status():
@@ -957,12 +884,50 @@ def waf_status():
     return jsonify({
         'learning_mode': WAFConfig.LEARNING_MODE,
         'protection_mode': WAFConfig.PROTECTION_MODE,
-        'blocked_ips_count': len(WAFConfig.BLOCKED_IPS),
-        'requests_per_minute': WAFConfig.REQUESTS_PER_MINUTE,
-        'sqli_sensitivity': WAFConfig.SQLI_SENSITIVITY,
-        'xss_sensitivity': WAFConfig.XSS_SENSITIVITY
+        'blocked_ips': WAFConfig.BLOCKED_IPS
     })
 
+# ============================
+# ADDITIONAL HELPER FUNCTIONS
+# ============================
+@app.template_filter('datetime')
+def format_datetime(value):
+    """Format timestamp to readable datetime"""
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value).strftime('%Y-%m-%d %H:%M:%S')
+    return str(value)
+
+@app.template_filter('threat_color')
+def threat_color(threat_type):
+    """Return color for threat type"""
+    if 'sql' in threat_type.lower():
+        return 'danger'
+    elif 'xss' in threat_type.lower():
+        return 'warning'
+    elif 'path' in threat_type.lower():
+        return 'info'
+    elif 'command' in threat_type.lower():
+        return 'primary'
+    else:
+        return 'secondary'
+
+# ============================
+# CONTEXT PROCESSOR
+# ============================
+@app.context_processor
+def inject_waf():
+    """Inject WAF variables into all templates"""
+    return dict(
+        waf_enabled=WAFConfig.LEARNING_MODE or WAFConfig.PROTECTION_MODE,
+        waf_learning_mode=WAFConfig.LEARNING_MODE,
+        waf_protection_mode=WAFConfig.PROTECTION_MODE,
+        waf_blocked_count=len(WAFConfig.BLOCKED_IPS),
+        is_admin=session.get('is_admin', False)
+    )
+
+# ============================
+# INITIALIZATION
+# ============================
 @app.before_request
 def initialize_database():
     if not app.config['DB_INITIALIZED']:
@@ -975,28 +940,31 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Content-Security-Policy'] = "default-src 'self'"
     return response
-
-# ============================
-# TEMPLATE CONTEXT PROCESSOR
-# ============================
-@app.context_processor
-def inject_waf_status():
-    """Inject WAF status into all templates"""
-    return dict(
-        waf_learning_mode=WAFConfig.LEARNING_MODE,
-        waf_protection_mode=WAFConfig.PROTECTION_MODE,
-        waf_blocked_count=len(WAFConfig.BLOCKED_IPS)
-    )
 
 # ============================
 # INITIALIZE WAF & REGISTER BLUEPRINT
 # ============================
 waf = WAFMiddleware(app)
-app.register_blueprint(waf_dashboard_bp)
+app.register_blueprint(waf_bp)
 
 if __name__ == '__main__':
     with app.app_context():
         init_db()
+    print("\n" + "="*60)
+    print("FAKE BANK PORTAL WITH WAF")
+    print("="*60)
+    print("\n📋 Demo Credentials:")
+    print("  Admin:  username='admin'      password='admin'")
+    print("  User:   username='waf_test'   password='test123'")
+    print("\n🔗 Important URLs:")
+    print("  Login:          http://localhost:5001/login")
+    print("  Dashboard:      http://localhost:5001/dashboard")
+    print("  WAF Dashboard:  http://localhost:5001/waf/dashboard  (admin only)")
+    print("  Test WAF:       http://localhost:5001/waf/test       (admin only)")
+    print("\n⚙️  WAF Status:")
+    print(f"  Learning Mode:     {WAFConfig.LEARNING_MODE}")
+    print(f"  Protection Mode:   {WAFConfig.PROTECTION_MODE}")
+    print(f"  Blocked IPs:       {len(WAFConfig.BLOCKED_IPS)}")
+    print("\n" + "="*60)
     app.run(debug=True, port=5001)
