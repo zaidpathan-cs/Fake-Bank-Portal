@@ -108,7 +108,21 @@
         </div>
     </div>
 </div>
-
+<!-- Add this somewhere in your dashboard.html -->
+<div class="waf-status" style="position: fixed; bottom: 10px; right: 10px; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 12px;">
+    <strong>WAF Status:</strong><br>
+    {% if waf_protection_mode %}
+        🔒 <span style="color: #dc3545;">Protection Mode</span>
+    {% elif waf_learning_mode %}
+        📝 <span style="color: #ffc107;">Learning Mode</span>
+    {% else %}
+        ⚠️ <span style="color: #6c757d;">Disabled</span>
+    {% endif %}
+    <br>
+    <small>Blocked IPs: {{ waf_blocked_count }}</small>
+    <br>
+    <a href="{{ url_for('waf.waf_admin') }}" style="color: #007bff; font-size: 10px;">WAF Dashboard</a>
+</div>
 <!-- Animation Script (Keep if needed) -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
