@@ -1,197 +1,150 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WAF Security Dashboard - Fake Bank Portal</title>
+    <title>WAF Dashboard - Fake Bank Portal</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         .header { background: #333; color: white; padding: 20px; border-radius: 5px; }
-        .stats-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 20px 0; }
+        .nav { margin: 20px 0; }
+        .nav a { margin-right: 15px; color: white; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 20px 0; }
         .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .stat-card h3 { margin-top: 0; color: #666; }
-        .stat-card p { font-size: 24px; font-weight: bold; margin: 10px 0; }
+        .stat-value { font-size: 24px; font-weight: bold; }
+        .sqli-stat { border-left: 4px solid #dc3545; }
+        .xss-stat { border-left: 4px solid #ffc107; }
+        .blocked-stat { border-left: 4px solid #28a745; }
         .mode-controls { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
         .mode-btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
         .learning-btn { background: #ffc107; color: #333; }
         .protection-btn { background: #dc3545; color: white; }
         .off-btn { background: #6c757d; color: white; }
-        .active-mode { border: 3px solid #000; }
-        .threat-log { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .threat-entry { border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px; }
-        .sql-threat { border-left: 4px solid #dc3545; background: #ffe6e6; }
-        .xss-threat { border-left: 4px solid #fd7e14; background: #fff3e6; }
-        .blocked-threat { border-left: 4px solid #28a745; background: #e6ffe6; }
+        .active { border: 3px solid black; }
+        .section { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .log-entry { border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .sqli-log { border-left: 4px solid #dc3545; background: #ffe6e6; }
+        .xss-log { border-left: 4px solid #ffc107; background: #fff3e6; }
+        .blocked-log { border-left: 4px solid #28a745; background: #e6ffe6; }
         .ip-block-form { margin: 20px 0; }
-        .ip-input { padding: 10px; width: 300px; }
-        .block-btn { padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 4px; }
-        .blocked-ips-list { margin: 20px 0; }
-        .blocked-ip { background: #ffe6e6; padding: 10px; margin: 5px 0; border-radius: 4px; }
-        .nav { margin: 20px 0; }
-        .nav a { margin-right: 15px; color: #007bff; text-decoration: none; }
+        .ip-input { padding: 8px; width: 200px; margin-right: 10px; }
+        .btn { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .danger-btn { background: #dc3545; }
+        .success-btn { background: #28a745; }
+        .timestamp { font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>WAF Security Dashboard</h1>
-            <p>Web Application Firewall Monitoring & Control</p>
+            <h1>⚔️ WAF Security Dashboard</h1>
+            <p>Welcome, {{ username }}! | Fake Bank Portal Web Application Firewall</p>
+            <div class="nav">
+                <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+                <a href="{{ url_for('waf.waf_test') }}">Test WAF</a>
+                <a href="{{ url_for('manage_users') }}">Manage Users</a>
+            </div>
         </div>
 
-        <div class="nav">
-            <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a> |
-            <a href="{{ url_for('waf.waf_test_page') }}">Test WAF</a>
-        </div>
-
-        <!-- Mode Controls -->
+        <!-- WAF Status -->
         <div class="mode-controls">
-            <h2>WAF Mode</h2>
-            <button class="mode-btn learning-btn {% if not config.PROTECTION_MODE and config.LEARNING_MODE %}active-mode{% endif %}" 
-                    onclick="setWAFMode('learning')">Learning Mode (Log Only)</button>
-            <button class="mode-btn protection-btn {% if config.PROTECTION_MODE %}active-mode{% endif %}" 
-                    onclick="setWAFMode('protection')">Protection Mode (Block)</button>
-            <button class="mode-btn off-btn {% if not config.PROTECTION_MODE and not config.LEARNING_MODE %}active-mode{% endif %}" 
-                    onclick="setWAFMode('off')">WAF Off</button>
-            <p><small>Current: 
-                {% if config.PROTECTION_MODE %}
-                    <strong style="color: #dc3545;">PROTECTION MODE</strong> - Blocking threats
-                {% elif config.LEARNING_MODE %}
-                    <strong style="color: #ffc107;">LEARNING MODE</strong> - Logging threats only
+            <h2>WAF Operation Mode</h2>
+            <p>Current mode: 
+                {% if protection_mode %}
+                    <span style="color: #dc3545; font-weight: bold;">🔒 PROTECTION MODE</span> - Blocking malicious requests
+                {% elif learning_mode %}
+                    <span style="color: #ffc107; font-weight: bold;">📝 LEARNING MODE</span> - Logging threats only
                 {% else %}
-                    <strong style="color: #6c757d;">WAF DISABLED</strong>
+                    <span style="color: #6c757d; font-weight: bold;">⚠️ DISABLED</span>
                 {% endif %}
-            </small></p>
-        </div>
-
-        <!-- Stats Container -->
-        <div class="stats-container">
-            <div class="stat-card">
-                <h3>Total Threats (24h)</h3>
-                <p id="total-threats">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>Blocked Requests</h3>
-                <p id="blocked-requests">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>SQLi Attempts</h3>
-                <p id="sqli-attempts">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>XSS Attempts</h3>
-                <p id="xss-attempts">0</p>
-            </div>
-        </div>
-
-        <!-- IP Blocking Form -->
-        <div class="ip-block-form">
-            <h2>IP Address Management</h2>
-            <input type="text" class="ip-input" id="ip-input" placeholder="Enter IP address to block">
-            <input type="text" class="ip-input" id="reason-input" placeholder="Reason for blocking">
-            <button class="block-btn" onclick="blockIP()">Block IP</button>
+            </p>
             
-            <div class="blocked-ips-list" id="blocked-ips-container">
-                <h3>Currently Blocked IPs</h3>
-                {% for ip in blocked_ips %}
-                <div class="blocked-ip">
-                    {{ ip.ip }} - {{ ip.reason }} ({{ ip.blocked_at }})
-                    <button onclick="unblockIP('{{ ip.ip }}')" style="float: right; background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px;">
-                        Unblock
-                    </button>
+            <button class="mode-btn learning-btn {% if learning_mode and not protection_mode %}active{% endif %}"
+                    onclick="window.location.href='{{ url_for('waf.toggle_mode', mode='learning') }}'">
+                Learning Mode
+            </button>
+            <button class="mode-btn protection-btn {% if protection_mode %}active{% endif %}"
+                    onclick="window.location.href='{{ url_for('waf.toggle_mode', mode='protection') }}'">
+                Protection Mode
+            </button>
+            <button class="mode-btn off-btn {% if not learning_mode and not protection_mode %}active{% endif %}"
+                    onclick="window.location.href='{{ url_for('waf.toggle_mode', mode='off') }}'">
+                Disable WAF
+            </button>
+        </div>
+
+        <!-- Statistics -->
+        <div class="section">
+            <h2>Security Statistics</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Total Threats</h3>
+                    <div class="stat-value">{{ total_threats }}</div>
+                </div>
+                <div class="stat-card blocked-stat">
+                    <h3>Blocked Requests</h3>
+                    <div class="stat-value">{{ blocked_threats }}</div>
+                </div>
+                {% for threat_type, count in threat_types %}
+                <div class="stat-card {% if 'sql' in threat_type %}sqli-stat{% elif 'xss' in threat_type %}xss-stat{% endif %}">
+                    <h3>{{ threat_type|upper }} Attempts</h3>
+                    <div class="stat-value">{{ count }}</div>
                 </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Threat Log -->
-        <div class="threat-log">
-            <h2>Recent Threat Logs (Last 50)</h2>
-            <div id="threats-list">
-                {% for log in recent_logs %}
-                <div class="threat-entry 
-                    {% if 'sql' in log.threat_type %}sql-threat
-                    {% elif 'xss' in log.threat_type %}xss-threat
-                    {% elif log.blocked %}blocked-threat
-                    {% endif %}">
-                    <strong>{{ log.timestamp | datetime }}</strong> |
+        <!-- IP Blocking -->
+        <div class="section">
+            <h2>IP Address Management</h2>
+            <form action="{{ url_for('waf.block_ip') }}" method="POST" class="ip-block-form">
+                <input type="text" name="ip" class="ip-input" placeholder="IP Address" required>
+                <input type="text" name="reason" class="ip-input" placeholder="Reason" required>
+                <button type="submit" class="btn danger-btn">Block IP</button>
+            </form>
+            
+            <h3>Blocked IPs ({{ blocked_ips|length }})</h3>
+            {% for ip in blocked_ips %}
+            <div style="background: #ffe6e6; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                {{ ip }}
+                <a href="{{ url_for('waf.unblock_ip', ip=ip) }}" 
+                   onclick="return confirm('Unblock {{ ip }}?')"
+                   style="float: right; background: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">
+                    Unblock
+                </a>
+            </div>
+            {% else %}
+            <p>No IPs currently blocked.</p>
+            {% endfor %}
+        </div>
+
+        <!-- Recent Logs -->
+        <div class="section">
+            <h2>Recent Security Events (Last 20)</h2>
+            {% if logs %}
+                {% for log in logs|reverse %}
+                <div class="log-entry 
+                    {% if 'sql' in log.threats[0].type %}sqli-log
+                    {% elif 'xss' in log.threats[0].type %}xss-log
+                    {% elif log.blocked %}blocked-log{% endif %}">
+                    <strong>{{ log.timestamp|datetime }}</strong> | 
                     IP: {{ log.ip }} | 
-                    Method: {{ log.method }} | 
-                    Path: {{ log.path }}<br>
-                    Threat: {{ log.threat_type }} |
+                    {{ log.method }} {{ log.path }}<br>
+                    {% for threat in log.threats %}
+                    <span style="color: {% if 'sql' in threat.type %}#dc3545{% elif 'xss' in threat.type %}#ffc107{% else %}#333{% endif %};">
+                        {{ threat.type|upper }} detected
+                    </span>
+                    {% endfor %}
                     {% if log.blocked %}
-                        <span style="color: #28a745;">BLOCKED</span>
-                    {% else %}
-                        <span style="color: #ffc107;">LOGGED</span>
+                    <span style="color: #28a745; font-weight: bold;">[BLOCKED]</span>
                     {% endif %}
                 </div>
                 {% endfor %}
-            </div>
+            {% else %}
+                <p>No security events logged yet.</p>
+            {% endif %}
         </div>
     </div>
-
-    <script>
-        // Load WAF stats
-        async function loadStats() {
-            const response = await fetch('/waf/stats');
-            const stats = await response.json();
-            
-            document.getElementById('total-threats').textContent = stats.total_logs;
-            document.getElementById('blocked-requests').textContent = stats.blocked_logs;
-            document.getElementById('sqli-attempts').textContent = stats.threat_types?.sql_injection || 0;
-            document.getElementById('xss-attempts').textContent = stats.threat_types?.xss || 0;
-        }
-
-        // Set WAF mode
-        async function setWAFMode(mode) {
-            const response = await fetch('/waf/toggle_mode', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: mode })
-            });
-            
-            const result = await response.json();
-            alert(result.message);
-            location.reload();
-        }
-
-        // Block IP
-        async function blockIP() {
-            const ip = document.getElementById('ip-input').value;
-            const reason = document.getElementById('reason-input').value;
-            
-            if (!ip) {
-                alert('Please enter an IP address');
-                return;
-            }
-            
-            const response = await fetch('/waf/block_ip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ip: ip, reason: reason })
-            });
-            
-            const result = await response.json();
-            alert(result.message);
-            location.reload();
-        }
-
-        // Unblock IP
-        async function unblockIP(ip) {
-            if (!confirm(`Unblock IP ${ip}?`)) return;
-            
-            const response = await fetch('/waf/unblock_ip', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ip: ip })
-            });
-            
-            const result = await response.json();
-            alert(result.message);
-            location.reload();
-        }
-
-        // Auto-refresh stats every 10 seconds
-        loadStats();
-        setInterval(loadStats, 10000);
-    </script>
 </body>
 </html>
