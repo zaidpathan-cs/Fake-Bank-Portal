@@ -1,113 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WAF Test Page - Fake Bank Portal</title>
+    <title>Test WAF - Fake Bank Portal</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; }
         .header { background: #333; color: white; padding: 20px; border-radius: 5px; }
-        .test-section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; }
-        .test-case { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px; }
-        .sql-test { border-left: 4px solid #dc3545; }
-        .xss-test { border-left: 4px solid #fd7e14; }
-        .path-test { border-left: 4px solid #28a745; }
-        .test-btn { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .nav { margin: 20px 0; }
+        .nav a { margin-right: 15px; color: white; text-decoration: none; }
+        .nav a:hover { text-decoration: underline; }
+        .test-case { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .sqli-test { border-left: 4px solid #dc3545; }
+        .xss-test { border-left: 4px solid #ffc107; }
+        .test-btn { padding: 10px 20px; margin: 10px 0; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .danger-btn { background: #dc3545; }
         .result { margin-top: 10px; padding: 10px; border-radius: 4px; display: none; }
         .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
-        .nav { margin: 20px 0; }
-        .nav a { margin-right: 15px; color: #007bff; text-decoration: none; }
+        .payload { font-family: monospace; background: #f8f9fa; padding: 5px; border-radius: 3px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>WAF Test Suite</h1>
-            <p>Test various attack vectors against the WAF</p>
+            <h1>🧪 WAF Test Page</h1>
+            <p>Test the Web Application Firewall with various attack payloads</p>
+            <div class="nav">
+                <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+                <a href="{{ url_for('waf.waf_dashboard') }}">WAF Dashboard</a>
+            </div>
         </div>
 
-        <div class="nav">
-            <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a> |
-            <a href="{{ url_for('waf.waf_admin') }}">WAF Dashboard</a>
-        </div>
-
-        <div class="test-section">
+        <div class="test-case sqli-test">
             <h2>SQL Injection Tests</h2>
-            {% for test in test_cases['SQL Injection'] %}
-            <div class="test-case sql-test">
-                <h4>Test {{ loop.index }}: SQL Injection via {{ test.url }}</h4>
-                <p><strong>Payload:</strong> {{ test.payload|tojson }}</p>
-                <button class="test-btn" onclick="runTest('{{ test.url }}', {{ test.payload|tojson }}, '{{ test.method }}', this)">
-                    Run Test
+            {% for test in test_cases if 'SQL' in test.name %}
+            <div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px;">
+                <h3>{{ test.name }}</h3>
+                <p>{{ test.description }}</p>
+                <p><strong>Payload:</strong> <span class="payload">{{ test.payload|tojson }}</span></p>
+                <button class="test-btn danger-btn" onclick="runTest(this, '{{ test.url }}', {{ test.payload|tojson }}, '{{ test.method }}')">
+                    Test {{ test.name }}
                 </button>
                 <div class="result" id="result-{{ loop.index }}"></div>
             </div>
             {% endfor %}
         </div>
 
-        <div class="test-section">
-            <h2>XSS Attack Tests</h2>
-            {% for test in test_cases['XSS Attacks'] %}
-            <div class="test-case xss-test">
-                <h4>Test {{ loop.index }}: XSS via {{ test.url }}</h4>
-                <p><strong>Payload:</strong> {{ test.payload|tojson }}</p>
-                <button class="test-btn" onclick="runTest('{{ test.url }}', {{ test.payload|tojson }}, '{{ test.method }}', this)">
-                    Run Test
+        <div class="test-case xss-test">
+            <h2>XSS Tests</h2>
+            {% for test in test_cases if 'XSS' in test.name %}
+            <div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px;">
+                <h3>{{ test.name }}</h3>
+                <p>{{ test.description }}</p>
+                <p><strong>Payload:</strong> <span class="payload">{{ test.payload|tojson }}</span></p>
+                <button class="test-btn danger-btn" onclick="runTest(this, '{{ test.url }}', {{ test.payload|tojson }}, '{{ test.method }}')">
+                    Test {{ test.name }}
                 </button>
                 <div class="result" id="result-xss-{{ loop.index }}"></div>
             </div>
             {% endfor %}
         </div>
 
-        <div class="test-section">
-            <h2>Path Traversal Tests</h2>
-            {% for test in test_cases['Path Traversal'] %}
-            <div class="test-case path-test">
-                <h4>Test {{ loop.index }}: Path Traversal via {{ test.url }}</h4>
-                <p><strong>Payload:</strong> {{ test.payload|tojson }}</p>
-                <button class="test-btn" onclick="runTest('{{ test.url }}', {{ test.payload|tojson }}, '{{ test.method }}', this)">
-                    Run Test
-                </button>
-                <div class="result" id="result-path-{{ loop.index }}"></div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <div class="test-section">
+        <div class="test-case">
             <h2>Manual Test</h2>
-            <div class="test-case">
-                <h4>Custom Test</h4>
-                <input type="text" id="custom-url" placeholder="/login" style="width: 300px; padding: 8px;">
+            <div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px;">
+                <h3>Custom Test</h3>
+                <p>Test your own payload:</p>
+                <input type="text" id="custom-url" placeholder="/login" style="width: 200px; padding: 8px; margin: 5px;">
                 <select id="custom-method" style="padding: 8px;">
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
-                </select>
+                </select><br>
                 <textarea id="custom-payload" placeholder='{"username": "test", "password": "test"}' 
-                          style="width: 100%; padding: 8px; margin: 10px 0;"></textarea>
-                <button class="test-btn danger-btn" onclick="runCustomTest()">Run Custom Test</button>
+                          style="width: 100%; padding: 8px; margin: 10px 0; height: 100px;"></textarea><br>
+                <button class="test-btn" onclick="runCustomTest()">Run Custom Test</button>
                 <div class="result" id="custom-result"></div>
             </div>
         </div>
     </div>
 
     <script>
-        async function runTest(url, payload, method, button) {
+        async function runTest(button, url, params, method) {
             button.disabled = true;
             button.textContent = 'Testing...';
             
             try {
                 const options = {
                     method: method,
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: {}
                 };
                 
                 if (method === 'POST') {
-                    options.body = JSON.stringify(payload);
-                } else if (Object.keys(payload).length > 0) {
-                    const params = new URLSearchParams(payload);
-                    url = url + '?' + params.toString();
+                    options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                    const formData = new URLSearchParams();
+                    for (const key in params) {
+                        formData.append(key, params[key]);
+                    }
+                    options.body = formData;
+                } else {
+                    // For GET requests
+                    const urlParams = new URLSearchParams(params);
+                    url = url + '?' + urlParams.toString();
                 }
                 
                 const response = await fetch(url, options);
@@ -118,23 +112,24 @@
                     resultDiv.className = 'result success';
                     resultDiv.innerHTML = `
                         <strong>✅ WAF BLOCKED THIS REQUEST</strong><br>
-                        Status: ${response.status}<br>
-                        This attack was successfully blocked by the WAF.
+                        Status Code: ${response.status}<br>
+                        The WAF successfully blocked this attack!<br>
+                        <small>Check the WAF dashboard for more details.</small>
                     `;
-                } else if (response.status >= 400) {
-                    resultDiv.className = 'result warning';
-                    resultDiv.innerHTML = `
-                        <strong>⚠️ SERVER ERROR</strong><br>
-                        Status: ${response.status}<br>
-                        The server returned an error.
-                    `;
-                } else {
+                } else if (response.status === 200) {
                     resultDiv.className = 'result danger';
                     resultDiv.innerHTML = `
-                        <strong>❌ VULNERABILITY DETECTED</strong><br>
-                        Status: ${response.status}<br>
-                        This attack was NOT blocked by the WAF.<br>
-                        <small>Check WAF logs for details.</small>
+                        <strong>⚠️ VULNERABILITY DETECTED</strong><br>
+                        Status Code: ${response.status}<br>
+                        The attack was NOT blocked by the WAF!<br>
+                        <small>This could indicate a security vulnerability.</small>
+                    `;
+                } else {
+                    resultDiv.className = 'result warning';
+                    resultDiv.innerHTML = `
+                        <strong>Server Response: ${response.status}</strong><br>
+                        The server responded with status ${response.status}.<br>
+                        <small>This might be a normal response or an error.</small>
                     `;
                 }
                 
@@ -145,7 +140,7 @@
                 resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
             } finally {
                 button.disabled = false;
-                button.textContent = 'Run Test';
+                button.textContent = button.textContent.replace('...', '');
             }
         }
         
@@ -154,16 +149,16 @@
             const method = document.getElementById('custom-method').value;
             const payloadText = document.getElementById('custom-payload').value;
             
-            let payload = {};
+            let params = {};
             try {
-                payload = JSON.parse(payloadText);
+                params = JSON.parse(payloadText);
             } catch (e) {
-                alert('Invalid JSON payload');
+                alert('Invalid JSON payload. Please check your input.');
                 return;
             }
             
             const button = document.querySelector('#custom-result').previousElementSibling;
-            runTest(url, payload, method, button);
+            runTest(button, url, params, method);
         }
     </script>
 </body>
